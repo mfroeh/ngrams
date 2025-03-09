@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, io, path::PathBuf};
+use std::{collections::HashMap, fs, io, path::PathBuf, process::exit};
 
 use clap::{Parser, ValueEnum};
 
@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
     for path in args.paths.iter() {
         if !path.exists() {
             eprintln!("{}: no such file or directory", path.to_str().unwrap());
-            return Ok(());
+            exit(1);
         }
     }
 
