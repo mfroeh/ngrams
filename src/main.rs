@@ -5,12 +5,15 @@ use clap::{Parser, ValueEnum};
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Args {
-    path: Vec<PathBuf>,
+    /// the paths to recursively search for files
+    #[arg(required = true)]
+    paths: Vec<PathBuf>,
 
+    /// the n in n-grams
     #[arg(short, long, default_value_t = 2)]
     n: usize,
 
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "all")]
     mode: Mode,
 }
 
@@ -26,8 +29,15 @@ enum Mode {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut walk = ignore::WalkBuilder::new(&args.path[0]);
-    for path in args.path.iter().skip(1) {
+    for path in args.paths.iter() {
+        if !path.exists() {
+            eprintln!("{}: no such file or directory", path.to_str().unwrap());
+            return Ok(());
+        }
+    }
+
+    let mut walk = ignore::WalkBuilder::new(&args.paths[0]);
+    for path in args.paths.iter().skip(1) {
         walk.add(path);
     }
     let walk = walk.build();
