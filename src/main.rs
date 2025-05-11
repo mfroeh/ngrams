@@ -15,6 +15,10 @@ struct Args {
 
     #[arg(short, long, default_value = "all")]
     mode: Mode,
+
+    /// whether whitespace only ngrams should be excluded
+    #[arg(short, long, default_value_t = true)]
+    exclude_whitespace_only: bool,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -54,48 +58,53 @@ fn main() -> anyhow::Result<()> {
         }
         let content = content.unwrap();
 
-        for seq in content.split_whitespace() {
-            for ngram in seq.chars().collect::<Vec<_>>().windows(args.n) {
-                match args.mode {
-                    Mode::Alpha => {
-                        if ngram.iter().any(|c| !c.is_alphabetic()) {
-                            continue;
-                        }
+        for ngram in content.chars().collect::<Vec<_>>().windows(args.n) {
+            match args.mode {
+                Mode::Alpha => {
+                    if ngram.iter().any(|c| !c.is_alphabetic()) {
+                        continue;
                     }
-                    Mode::Numeric => {
-                        if ngram.iter().any(|c| !c.is_numeric()) {
-                            continue;
-                        }
-                    }
-                    Mode::Alnum => {
-                        if ngram.iter().any(|c| !c.is_alphanumeric()) {
-                            continue;
-                        }
-                    }
-                    Mode::Symbols => {
-                        if ngram.iter().any(|c| c.is_alphanumeric()) {
-                            continue;
-                        }
-                    }
-                    Mode::All => {}
                 }
-
-                let str = String::from_iter(ngram);
-                *ngrams.entry(str).or_default() += 1;
+                Mode::Numeric => {
+                    if ngram.iter().any(|c| !c.is_numeric()) {
+                        continue;
+                    }
+                }
+                Mode::Alnum => {
+                    if ngram.iter().any(|c| !c.is_alphanumeric()) {
+                        continue;
+                    }
+                }
+                Mode::Symbols => {
+                    if ngram.iter().any(|c| c.is_alphanumeric()) {
+                        continue;
+                    }
+                }
+                Mode::All => {}
             }
+
+            if args.exclude_whitespace_only {
+                if ngram.iter().all(|c| c.is_whitespace()) {
+                    continue;
+                }
+            }
+
+            let str = String::from_iter(ngram);
+            *ngrams.entry(str).or_default() += 1;
         }
     }
 
     let mut entries: Vec<(String, u64)> = ngrams.into_iter().collect();
     entries.sort_by(|a, b| a.1.cmp(&b.1));
 
-    let mut csv = csv::WriterBuilder::new()
-        .quote(b'\'')
-        .from_writer(io::stdout());
     for (ngram, count) in entries.into_iter().rev() {
-        csv.write_record(&[ngram, count.to_string()])?;
+        let ngram = ngram
+            .replace(" ", "␣")
+            .replace("\r\n", "\n")
+            .replace("\n", "↵")
+            .replace("\t", "\\t");
+        println!("{} {}", ngram, count)
     }
-    csv.flush()?;
 
     Ok(())
 }
